@@ -65,11 +65,13 @@
 #ifdef USELABELS
 #define CASE(opcode) opc ## opcode
 #define DEFAULT opc_default
-#define ENDCASE(opcode) opc ## opcode ## end :
+#define ENDCASE(opcode) opc ## opcode ## _end :
+#define ENDDEFAULT opc_default_end :
 #else
 #define CASE(opcode) case Bytecodes:: opcode
 #define DEFAULT default
 #define ENDCASE(opcode)
+#define ENDDEFAULT
 #endif
 
 /*
@@ -593,6 +595,88 @@ BytecodeInterpreter::run(interpreterState istate) {
 /* 0xFC */ &&opc_default,     &&opc_default,        &&opc_default,      &&opc_default
   };
   register uintptr_t *dispatch_table = (uintptr_t*)&opclabels_data[0];
+  const static void* const opclabels_end_data[256] = {
+/* 0x00 */ &&opc_nop_end,     &&opc_aconst_null_end, &&opc_iconst_m1_end,&&opc_iconst_0_end,
+/* 0x04 */ &&opc_iconst_1_end,&&opc_iconst_2_end,    &&opc_iconst_3_end, &&opc_iconst_4_end,
+/* 0x08 */ &&opc_iconst_5_end,&&opc_lconst_0_end,    &&opc_lconst_1_end, &&opc_fconst_0_end,
+/* 0x0C */ &&opc_fconst_1_end,&&opc_fconst_2_end,    &&opc_dconst_0_end, &&opc_dconst_1_end,
+
+/* 0x10 */ &&opc_bipush_end, &&opc_sipush_end, &&opc_ldc_end,    &&opc_ldc_w_end,
+/* 0x14 */ &&opc_ldc2_w_end, &&opc_iload_end,  &&opc_lload_end,  &&opc_fload_end,
+/* 0x18 */ &&opc_dload_end,  &&opc_aload_end,  &&opc_iload_0_end,&&opc_iload_1_end,
+/* 0x1C */ &&opc_iload_2_end,&&opc_iload_3_end,&&opc_lload_0_end,&&opc_lload_1_end,
+
+/* 0x20 */ &&opc_lload_2_end,&&opc_lload_3_end,&&opc_fload_0_end,&&opc_fload_1_end,
+/* 0x24 */ &&opc_fload_2_end,&&opc_fload_3_end,&&opc_dload_0_end,&&opc_dload_1_end,
+/* 0x28 */ &&opc_dload_2_end,&&opc_dload_3_end,&&opc_aload_0_end,&&opc_aload_1_end,
+/* 0x2C */ &&opc_aload_2_end,&&opc_aload_3_end,&&opc_iaload_end, &&opc_laload_end,
+
+/* 0x30 */ &&opc_faload_end,  &&opc_daload_end,  &&opc_aaload_end,  &&opc_baload_end,
+/* 0x34 */ &&opc_caload_end,  &&opc_saload_end,  &&opc_istore_end,  &&opc_lstore_end,
+/* 0x38 */ &&opc_fstore_end,  &&opc_dstore_end,  &&opc_astore_end,  &&opc_istore_0_end,
+/* 0x3C */ &&opc_istore_1_end,&&opc_istore_2_end,&&opc_istore_3_end,&&opc_lstore_0_end,
+
+/* 0x40 */ &&opc_lstore_1_end,&&opc_lstore_2_end,&&opc_lstore_3_end,&&opc_fstore_0_end,
+/* 0x44 */ &&opc_fstore_1_end,&&opc_fstore_2_end,&&opc_fstore_3_end,&&opc_dstore_0_end,
+/* 0x48 */ &&opc_dstore_1_end,&&opc_dstore_2_end,&&opc_dstore_3_end,&&opc_astore_0_end,
+/* 0x4C */ &&opc_astore_1_end,&&opc_astore_2_end,&&opc_astore_3_end,&&opc_iastore_end,
+
+/* 0x50 */ &&opc_lastore_end,&&opc_fastore_end,&&opc_dastore_end,&&opc_aastore_end,
+/* 0x54 */ &&opc_bastore_end,&&opc_castore_end,&&opc_sastore_end,&&opc_pop_end,
+/* 0x58 */ &&opc_pop2_end,   &&opc_dup_end,    &&opc_dup_x1_end, &&opc_dup_x2_end,
+/* 0x5C */ &&opc_dup2_end,   &&opc_dup2_x1_end,&&opc_dup2_x2_end,&&opc_swap_end,
+
+/* 0x60 */ &&opc_iadd_end,&&opc_ladd_end,&&opc_fadd_end,&&opc_dadd_end,
+/* 0x64 */ &&opc_isub_end,&&opc_lsub_end,&&opc_fsub_end,&&opc_dsub_end,
+/* 0x68 */ &&opc_imul_end,&&opc_lmul_end,&&opc_fmul_end,&&opc_dmul_end,
+/* 0x6C */ &&opc_idiv_end,&&opc_ldiv_end,&&opc_fdiv_end,&&opc_ddiv_end,
+
+/* 0x70 */ &&opc_irem_end, &&opc_lrem_end, &&opc_frem_end,&&opc_drem_end,
+/* 0x74 */ &&opc_ineg_end, &&opc_lneg_end, &&opc_fneg_end,&&opc_dneg_end,
+/* 0x78 */ &&opc_ishl_end, &&opc_lshl_end, &&opc_ishr_end,&&opc_lshr_end,
+/* 0x7C */ &&opc_iushr_end,&&opc_lushr_end,&&opc_iand_end,&&opc_land_end,
+
+/* 0x80 */ &&opc_ior_end, &&opc_lor_end,&&opc_ixor_end,&&opc_lxor_end,
+/* 0x84 */ &&opc_iinc_end,&&opc_i2l_end,&&opc_i2f_end, &&opc_i2d_end,
+/* 0x88 */ &&opc_l2i_end, &&opc_l2f_end,&&opc_l2d_end, &&opc_f2i_end,
+/* 0x8C */ &&opc_f2l_end, &&opc_f2d_end,&&opc_d2i_end, &&opc_d2l_end,
+
+/* 0x90 */ &&opc_d2f_end,  &&opc_i2b_end,  &&opc_i2c_end,  &&opc_i2s_end,
+/* 0x94 */ &&opc_lcmp_end, &&opc_fcmpl_end,&&opc_fcmpg_end,&&opc_dcmpl_end,
+/* 0x98 */ &&opc_dcmpg_end,&&opc_ifeq_end, &&opc_ifne_end, &&opc_iflt_end,
+/* 0x9C */ &&opc_ifge_end, &&opc_ifgt_end, &&opc_ifle_end, &&opc_if_icmpeq_end,
+
+/* 0xA0 */ &&opc_if_icmpne_end,&&opc_if_icmplt_end,&&opc_if_icmpge_end,  &&opc_if_icmpgt_end,
+/* 0xA4 */ &&opc_if_icmple_end,&&opc_if_acmpeq_end,&&opc_if_acmpne_end,  &&opc_goto_end,
+/* 0xA8 */ &&opc_jsr_end,      &&opc_ret_end,      &&opc_tableswitch_end,&&opc_lookupswitch_end,
+/* 0xAC */ &&opc_ireturn_end,  &&opc_lreturn_end,  &&opc_freturn_end,    &&opc_dreturn_end,
+
+/* 0xB0 */ &&opc_areturn_end,     &&opc_return_end,         &&opc_getstatic_end,    &&opc_putstatic_end,
+/* 0xB4 */ &&opc_getfield_end,    &&opc_putfield_end,       &&opc_invokevirtual_end,&&opc_invokespecial_end,
+/* 0xB8 */ &&opc_invokestatic_end,&&opc_invokeinterface_end,&&opc_invokedynamic_end,&&opc_new_end,
+/* 0xBC */ &&opc_newarray_end,    &&opc_anewarray_end,      &&opc_arraylength_end,  &&opc_athrow_end,
+
+/* 0xC0 */ &&opc_checkcast_end,   &&opc_instanceof_end,     &&opc_monitorenter_end, &&opc_monitorexit_end,
+/* 0xC4 */ &&opc_wide_end,        &&opc_multianewarray_end, &&opc_ifnull_end,       &&opc_ifnonnull_end,
+/* 0xC8 */ &&opc_goto_w_end,      &&opc_jsr_w_end,          &&opc_breakpoint_end,   &&opc_default_end,
+/* 0xCC */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+
+/* 0xD0 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+/* 0xD4 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+/* 0xD8 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+/* 0xDC */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+
+/* 0xE0 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+/* 0xE4 */ &&opc_default_end,     &&opc_default_end,        &&opc_fast_aldc_end,    &&opc_fast_aldc_w_end,
+/* 0xE8 */ &&opc_return_register_finalizer_end,
+                              &&opc_invokehandle_end,       &&opc_default_end,      &&opc_default_end,
+/* 0xEC */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+
+/* 0xF0 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+/* 0xF4 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+/* 0xF8 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
+/* 0xFC */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end
+  };
 #endif /* USELABELS */
 
 #ifdef ASSERT
@@ -3055,6 +3139,7 @@ run:
       DEFAULT:
           fatal(err_msg("Unimplemented opcode %d = %s", opcode,
                         Bytecodes::name((Bytecodes::Code)opcode)));
+	  ENDDEFAULT;
           goto finish;
 
       } /* switch(opc) */
@@ -3066,10 +3151,13 @@ run:
     {
       if (!THREAD->has_pending_exception()) {
         CONTINUE;
+      check_for_exception_end:
         DISPATCH(opcode);
       }
+    check_for_exception_2:
       /* We will be gcsafe soon, so flush our state. */
       DECACHE_PC();
+    check_for_exception_2_end:
       goto handle_exception;
     }
   do_continue: ;
@@ -3117,8 +3205,10 @@ run:
 
       // Update profiling data.
       BI_PROFILE_ALIGN_TO_CURRENT_BCI();
+    handle_exception_end:
       goto run;
     }
+  handle_exception_2:
     if (TraceExceptions) {
       ttyLocker ttyl;
       ResourceMark rm;
@@ -3134,6 +3224,7 @@ run:
     NOT_PRODUCT(Exceptions::debug_check_abort(except_oop));
     // No handler in this activation, unwind and try again
     THREAD->set_pending_exception(except_oop(), NULL, 0);
+  handle_exception_2_end:
     goto handle_return;
   }  // handle_exception:
 
@@ -3152,7 +3243,7 @@ run:
     THREAD->clr_pop_frame_pending();
     // Let interpreter (only) see the we're in the process of popping a frame
     THREAD->set_pop_frame_in_process();
-
+  handle_Pop_Frame_end:
     goto handle_return;
 
   } // handle_Pop_Frame
@@ -3453,6 +3544,9 @@ run:
     // Normal return
     // Advance the pc and return to frame manager
     UPDATE_PC_AND_RETURN(1);
+  handle_Early_Return_end:
+  handle_return_end:
+    ;
   } /* handle_return: */
 
 // This is really a fatal error return
