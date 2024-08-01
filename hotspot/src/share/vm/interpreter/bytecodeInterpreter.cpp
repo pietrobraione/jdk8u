@@ -74,6 +74,10 @@
 #define ENDDEFAULT
 #endif
 
+// JavaStack Implementation
+#define MORE_STACK(count)  \
+  (topOfStack -= ((count) * Interpreter::stackElementWords))
+
 /*
  * PREFETCH_OPCCODE - Some compilers do better if you prefetch the next
  * opcode before going back to the top of the while loop, rather then having
@@ -94,12 +98,12 @@
   in relation to a safepoint.
 */
 #define SAFEPOINT                                                                 \
-    if ( SafepointSynchronize::is_synchronizing()) {                              \
+    if ( _SafepointSynchronize__is_synchronizing()) {                             \
         {                                                                         \
           /* zap freed handles rather than GC'ing them */                         \
           HandleMarkCleaner __hmc(THREAD);                                        \
         }                                                                         \
-        CALL_VM(SafepointSynchronize::block(THREAD), handle_exception);           \
+        CALL_VM(_SafepointSynchronize__block(THREAD), handle_exception);          \
     }
 
 /*
@@ -112,9 +116,9 @@
     DECACHE_STATE();                                                              \
     SET_LAST_JAVA_FRAME();                                                        \
     {                                                                             \
-       InterpreterRuntime::note_a_trap(THREAD, istate->method(), BCI());          \
+       _InterpreterRuntime__ ## note_a_trap(THREAD, istate->method(), BCI());     \
        ThreadInVMfromJava trans(THREAD);                                          \
-       Exceptions::_throw_msg(THREAD, __FILE__, __LINE__, name, msg);             \
+       _Exceptions___throw_msg(THREAD, __FILE__, __LINE__, name, msg);            \
     }                                                                             \
     RESET_LAST_JAVA_FRAME();                                                      \
     CACHE_STATE();
@@ -129,13 +133,13 @@
 #else
 #define DO_UPDATE_INSTRUCTION_COUNT(opcode)                                                          \
 {                                                                                                    \
-    BytecodeCounter::_counter_value++;                                                               \
+    (*_BytecodeCounter___counter_value)++;                                                           \
     BytecodeHistogram::_counters[(Bytecodes::Code)opcode]++;                                         \
-    if (StopInterpreterAt && StopInterpreterAt == BytecodeCounter::_counter_value) os::breakpoint(); \
-    if (TraceBytecodes) {                                                                            \
-      CALL_VM((void)SharedRuntime::trace_bytecode(THREAD, 0,               \
-                                   topOfStack[Interpreter::expr_index_at(1)],   \
-                                   topOfStack[Interpreter::expr_index_at(2)]),  \
+    if (*_StopInterpreterAt && (*_StopInterpreterAt) == (*_BytecodeCounter___counter_value)) _os__breakpoint(); \
+    if (*_TraceBytecodes) {                                                                            \
+      CALL_VM((void)_SharedRuntime__trace_bytecode(THREAD, 0,               \
+                                   topOfStack[_Interpreter__expr_index_at(1)],   \
+                                   topOfStack[_Interpreter__expr_index_at(2)]),  \
                                    handle_exception);                      \
     }                                                                      \
 }
@@ -154,12 +158,12 @@
 */
 #define DEBUGGER_SINGLE_STEP_NOTIFY()                                            \
 {                                                                                \
-      if (_jvmti_interp_events) {                                                \
-        if (JvmtiExport::should_post_single_step()) {                            \
+  if ((*__jvmti_interp_events)) {					\
+        if (_JvmtiExport__should_post_single_step()) {                           \
           DECACHE_STATE();                                                       \
           SET_LAST_JAVA_FRAME();                                                 \
           ThreadInVMfromJava trans(THREAD);                                      \
-          JvmtiExport::at_single_stepping_point(THREAD,                          \
+          _JvmtiExport__at_single_stepping_point(THREAD,                         \
                                           istate->method(),                      \
                                           pc);                                   \
           RESET_LAST_JAVA_FRAME();                                               \
@@ -276,11 +280,11 @@
 #define GET_METHOD_COUNTERS(res)    \
   res = METHOD->method_counters();  \
   if (res == NULL) {                \
-    CALL_VM(res = InterpreterRuntime::build_method_counters(THREAD, METHOD), handle_exception); \
+    CALL_VM(res = _InterpreterRuntime__build_method_counters(THREAD, METHOD), handle_exception); \
   }
 
 #define OSR_REQUEST(res, branch_pc) \
-            CALL_VM(res=InterpreterRuntime::frequency_counter_overflow(THREAD, branch_pc), handle_exception);
+            CALL_VM(res=_InterpreterRuntime__frequency_counter_overflow(THREAD, branch_pc), handle_exception);
 /*
  * For those opcodes that need to have a GC point on a backwards branch
  */
@@ -297,14 +301,14 @@
     if ((skip) <= 0) {                                                                              \
       MethodCounters* mcs;                                                                          \
       GET_METHOD_COUNTERS(mcs);                                                                     \
-      if (UseLoopCounter) {                                                                         \
-        bool do_OSR = UseOnStackReplacement;                                                        \
+      if (*_UseLoopCounter) {                                                                       \
+        bool do_OSR = *_UseOnStackReplacement;                                                      \
         mcs->backedge_counter()->increment();                                                       \
-        if (ProfileInterpreter) {                                                                   \
+        if (*_ProfileInterpreter) {                                                                 \
           BI_PROFILE_GET_OR_CREATE_METHOD_DATA(handle_exception);                                   \
           /* Check for overflow against MDO count. */                                               \
           do_OSR = do_OSR                                                                           \
-            && (mdo_last_branch_taken_count >= (uint)InvocationCounter::InterpreterBackwardBranchLimit)\
+            && (mdo_last_branch_taken_count >= (uint)(*_InvocationCounter__InterpreterBackwardBranchLimit)) \
             /* When ProfileInterpreter is on, the backedge_count comes     */                       \
             /* from the methodDataOop, which value does not get reset on   */                       \
             /* the call to frequency_counter_overflow(). To avoid          */                       \
@@ -323,7 +327,7 @@
           if (osr_nmethod != NULL && osr_nmethod->osr_entry_bci() != InvalidOSREntryBci) {          \
             intptr_t* buf;                                                                          \
             /* Call OSR migration with last java frame only, no checks. */                          \
-            CALL_VM_NAKED_LJF(buf=SharedRuntime::OSR_migration_begin(THREAD));                      \
+            CALL_VM_NAKED_LJF(buf=_SharedRuntime__OSR_migration_begin(THREAD));                      \
             istate->set_msg(do_osr);                                                                \
             istate->set_osr_buf((address)buf);                                                      \
             istate->set_osr_entry(osr_nmethod->osr_entry());                                        \
@@ -375,7 +379,7 @@
 #undef CHECK_NULL
 #define CHECK_NULL(obj_)                                                                         \
         if ((obj_) == NULL) {                                                                    \
-          VM_JAVA_ERROR(vmSymbols::java_lang_NullPointerException(), NULL, note_nullCheck_trap); \
+          VM_JAVA_ERROR(_vmSymbols__java_lang_NullPointerException(), NULL, note_nullCheck_trap); \
         }                                                                                        \
         VERIFY_OOP(obj_)
 
@@ -677,6 +681,49 @@ BytecodeInterpreter::run(interpreterState istate) {
 /* 0xF8 */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end,
 /* 0xFC */ &&opc_default_end,     &&opc_default_end,        &&opc_default_end,      &&opc_default_end
   };
+
+  // Pointers to global data declared locally, used to force absolute addressing in asm for One
+#ifdef VM_JVMTI
+  bool              *volatile __jvmti_interp_events = &_jvmti_interp_events;
+#endif
+  
+  // Pointers to external data, used to force absolute addressing in asm for One
+  int               *volatile _BytecodeCounter___counter_value = &BytecodeCounter::_counter_value;
+  static int        *volatile _InvocationCounter__InterpreterBackwardBranchLimit = &InvocationCounter::InterpreterBackwardBranchLimit;
+  intx              *volatile _StopInterpreterAt = &StopInterpreterAt;
+  bool              *volatile _TraceBytecodes = &TraceBytecodes;
+  bool              *volatile _UseLoopCounter = &UseLoopCounter;
+  bool              *volatile _UseOnStackReplacement = &UseOnStackReplacement;
+  bool              *volatile _ProfileInterpreter = &ProfileInterpreter;
+  
+  // Pointers to functions, used to force absolute addressing in asm for One
+  bool              (*volatile _SafepointSynchronize__is_synchronizing)() = SafepointSynchronize::is_synchronizing;
+  void              (*volatile _SafepointSynchronize__block)(JavaThread*) = SafepointSynchronize::block;
+  void              (*volatile _os__breakpoint)() = os::breakpoint;
+  intptr_t          (*volatile _SharedRuntime__trace_bytecode)(JavaThread*, intptr_t, intptr_t, intptr_t) = SharedRuntime::trace_bytecode;
+  intptr_t*         (*volatile _SharedRuntime__OSR_migration_begin)(JavaThread*) = SharedRuntime::OSR_migration_begin;
+  int               (*volatile _Interpreter__expr_index_at)(int) = Interpreter::expr_index_at;
+  bool              (*volatile _JvmtiExport__should_post_single_step)() = JvmtiExport::should_post_single_step;
+  void              (*volatile _JvmtiExport__at_single_stepping_point)(JavaThread*, Method*, address) = JvmtiExport::at_single_stepping_point;
+  void              (*volatile _InterpreterRuntime__note_nullCheck_trap)(JavaThread*, Method*, int) = InterpreterRuntime::note_nullCheck_trap;
+  void              (*volatile _InterpreterRuntime__note_div0Check_trap)(JavaThread*, Method*, int) = InterpreterRuntime::note_div0Check_trap;
+  void              (*volatile _InterpreterRuntime__note_rangeCheck_trap)(JavaThread*, Method*, int) = InterpreterRuntime::note_rangeCheck_trap;
+  void              (*volatile _InterpreterRuntime__note_classCheck_trap)(JavaThread*, Method*, int) = InterpreterRuntime::note_classCheck_trap;
+  void              (*volatile _InterpreterRuntime__note_arrayCheck_trap)(JavaThread*, Method*, int) = InterpreterRuntime::note_arrayCheck_trap;
+  void              (*volatile _InterpreterRuntime__note_no_trap)(JavaThread*, Method*, int) = InterpreterRuntime::note_no_trap;
+  void              (*volatile _Exceptions___throw_msg)(Thread*, const char*, int, Symbol*, const char*) = Exceptions::_throw_msg;
+  MethodCounters*   (*volatile _InterpreterRuntime__build_method_counters)(JavaThread*, Method*) = InterpreterRuntime::build_method_counters;
+  nmethod*          (*volatile _InterpreterRuntime__frequency_counter_overflow)(JavaThread*, address) = InterpreterRuntime::frequency_counter_overflow;
+  Symbol*           (*volatile _vmSymbols__java_lang_NullPointerException)() = vmSymbols::java_lang_NullPointerException;
+  void              (*volatile _BytecodeInterpreter__astore)(intptr_t*, int, intptr_t*, int) = BytecodeInterpreter::astore;
+  void              (*volatile _BytecodeInterpreter__dup)(intptr_t*) = BytecodeInterpreter::dup;
+  void              (*volatile _BytecodeInterpreter__dup2)(intptr_t*) = BytecodeInterpreter::dup2;
+  void              (*volatile _BytecodeInterpreter__dup_x1)(intptr_t*) = BytecodeInterpreter::dup_x1;
+  void              (*volatile _BytecodeInterpreter__dup_x2)(intptr_t*) = BytecodeInterpreter::dup_x2;
+  void              (*volatile _BytecodeInterpreter__dup2_x1)(intptr_t*) = BytecodeInterpreter::dup2_x1;
+  void              (*volatile _BytecodeInterpreter__dup2_x2)(intptr_t*) = BytecodeInterpreter::dup2_x2;
+  void              (*volatile _BytecodeInterpreter__swap)(intptr_t*) = BytecodeInterpreter::swap;
+
 #endif /* USELABELS */
 
 #ifdef ASSERT
@@ -1219,7 +1266,7 @@ run:
           /* store to a local variable */
 
       CASE(_astore):
-          astore(topOfStack, -1, locals, pc[1]);
+          _BytecodeInterpreter__astore(topOfStack, -1, locals, pc[1]);
           UPDATE_PC_AND_TOS_AND_CONTINUE(2, -1);
           ENDCASE(_astore);
           DISPATCH(opcode);
@@ -1379,43 +1426,43 @@ run:
 
 
       CASE(_dup):               /* Duplicate the top item on the stack */
-          dup(topOfStack);
+          _BytecodeInterpreter__dup(topOfStack);
           UPDATE_PC_AND_TOS_AND_CONTINUE(1, 1);
           ENDCASE(_dup);
           DISPATCH(opcode);
 
       CASE(_dup2):              /* Duplicate the top 2 items on the stack */
-          dup2(topOfStack);
+          _BytecodeInterpreter__dup2(topOfStack);
           UPDATE_PC_AND_TOS_AND_CONTINUE(1, 2);
           ENDCASE(_dup2);
           DISPATCH(opcode);
 
       CASE(_dup_x1):    /* insert top word two down */
-          dup_x1(topOfStack);
+          _BytecodeInterpreter__dup_x1(topOfStack);
           UPDATE_PC_AND_TOS_AND_CONTINUE(1, 1);
           ENDCASE(_dup_x1);
           DISPATCH(opcode);
 
       CASE(_dup_x2):    /* insert top word three down  */
-          dup_x2(topOfStack);
+          _BytecodeInterpreter__dup_x2(topOfStack);
           UPDATE_PC_AND_TOS_AND_CONTINUE(1, 1);
           ENDCASE(_dup_x2);
           DISPATCH(opcode);
 
       CASE(_dup2_x1):   /* insert top 2 slots three down */
-          dup2_x1(topOfStack);
+          _BytecodeInterpreter__dup2_x1(topOfStack);
           UPDATE_PC_AND_TOS_AND_CONTINUE(1, 2);
           ENDCASE(_dup2_x1);
           DISPATCH(opcode);
 
       CASE(_dup2_x2):   /* insert top 2 slots four down */
-          dup2_x2(topOfStack);
+          _BytecodeInterpreter__dup2_x2(topOfStack);
           UPDATE_PC_AND_TOS_AND_CONTINUE(1, 2);
           ENDCASE(_dup2_x2);
           DISPATCH(opcode);
 
       CASE(_swap): {        /* swap top two elements on the stack */
-          swap(topOfStack);
+          _BytecodeInterpreter__swap(topOfStack);
           UPDATE_PC_AND_CONTINUE(1);
           ENDCASE(_swap);
           DISPATCH(opcode);

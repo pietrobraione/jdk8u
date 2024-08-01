@@ -53,10 +53,6 @@
 
 #ifdef CC_INTERP
 
-// JavaStack Implementation
-#define MORE_STACK(count)  \
-    (topOfStack -= ((count) * Interpreter::stackElementWords))
-
 // CVM definitions find hotspot equivalents...
 
 union VMJavaVal64 {

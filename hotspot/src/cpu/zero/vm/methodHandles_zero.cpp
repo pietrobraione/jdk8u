@@ -29,6 +29,10 @@
 #include "memory/allocation.inline.hpp"
 #include "prims/methodHandles.hpp"
 
+// JavaStack Implementation
+#define MORE_STACK(count)  \
+    (topOfStack -= ((count) * Interpreter::stackElementWords))
+
 void MethodHandles::invoke_target(Method* method, TRAPS) {
 
   JavaThread *thread = (JavaThread *) THREAD;
