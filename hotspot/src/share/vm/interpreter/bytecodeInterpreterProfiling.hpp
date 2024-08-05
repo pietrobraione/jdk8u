@@ -78,12 +78,9 @@
 // Accessors for the current method data pointer 'mdx'.
 #define MDX()        (istate->mdx())
 #define SET_MDX(mdx)                                                           \
-  if (TraceProfileInterpreter) {                                               \
+  if (*_TraceProfileInterpreter) {                                              \
     /* Let it look like TraceBytecodes' format. */                             \
-    tty->print_cr("[%d]           %4d  "                                       \
-                  "mdx " PTR_FORMAT "(%d)"                                     \
-                  "  "                                                         \
-                  " \t-> " PTR_FORMAT "(%d)",                                  \
+    tty->print_cr(_echo_fmt_1,                                                 \
                 (int) THREAD->osthread()->thread_id(),                         \
                 BCI(),                                                         \
                 p2i(MDX()),                                                    \
@@ -106,7 +103,7 @@
     ttyLocker ttyl;                                                            \
     MethodData *md = istate->method()->method_data();                          \
     tty->cr();                                                                 \
-    tty->print("method data at mdx " PTR_FORMAT "(0) for",                     \
+    tty->print(_echo_fmt_2,                                                    \
                p2i(md->data_layout_at(md->bci_to_di(0))));                     \
     istate->method()->print_short_name(tty);                                   \
     tty->cr();                                                                 \
@@ -114,12 +111,12 @@
       md->print_data_on(tty);                                                  \
       address mdx = (address) MDX();                                           \
       if (mdx != NULL) {                                                       \
-        tty->print_cr("current mdx " PTR_FORMAT "(%d)",                        \
+        tty->print_cr(_echo_fmt_3,                                             \
                       p2i(mdx),                                                \
                       istate->method()->method_data()->dp_to_di(mdx));         \
       }                                                                        \
     } else {                                                                   \
-      tty->print_cr("no method data");                                         \
+      tty->print_cr(_echo_fmt_4);                                              \
     }                                                                          \
   }
 #endif // PRODUCT
@@ -127,7 +124,7 @@
 
 // Gets or creates the profiling method data and initializes mdx.
 #define BI_PROFILE_GET_OR_CREATE_METHOD_DATA(exception_handler)                \
-  if (ProfileInterpreter && MDX() == NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() == NULL) {			\
     /* Mdx is not yet initialized for this activation. */                      \
     MethodData *md = istate->method()->method_data();                          \
     if (md == NULL) {                                                          \
@@ -138,11 +135,11 @@
       if (mcs->invocation_counter()                                            \
                          ->reached_ProfileLimit(mcs->backedge_counter())) {    \
         /* Must use CALL_VM, because an async exception may be pending. */     \
-        CALL_VM((InterpreterRuntime::profile_method(THREAD)),                  \
+        CALL_VM((_InterpreterRuntime__profile_method(THREAD)),                 \
                 exception_handler);                                            \
         md = istate->method()->method_data();                                  \
         if (md != NULL) {                                                      \
-          if (TraceProfileInterpreter) {                                       \
+          if (*_TraceProfileInterpreter) {                                       \
             BI_PROFILE_PRINT_METHOD_DATA();                                    \
           }                                                                    \
           Method *m = istate->method();                                        \
@@ -154,7 +151,7 @@
     } else {                                                                   \
       /* The profiling method data exists, align the method data pointer */    \
       /* mdx to the current bytecode index. */                                 \
-      if (TraceProfileInterpreter) {                                           \
+      if (*_TraceProfileInterpreter) {                                           \
         BI_PROFILE_PRINT_METHOD_DATA();                                        \
       }                                                                        \
       SET_MDX(md->data_layout_at(md->bci_to_di(BCI())));                       \
@@ -170,14 +167,12 @@
     MethodData *md = istate->method()->method_data();                          \
     address mdx  = (address) MDX();                                            \
     address mdx2 = (address) md->data_layout_at(md->bci_to_di(BCI()));         \
-    guarantee(md   != NULL, "1");                                              \
-    guarantee(mdx  != NULL, "2");                                              \
-    guarantee(mdx2 != NULL, "3");                                              \
+    guarantee(md   != NULL, _one_str);                                         \
+    guarantee(mdx  != NULL, _two_str);                                         \
+    guarantee(mdx2 != NULL, _three_str);                                       \
     if (mdx != mdx2) {                                                         \
       BI_PROFILE_PRINT_METHOD_DATA();                                          \
-      fatal3("invalid mdx at bci %d:"                                          \
-             " was " PTR_FORMAT                                                \
-             " but expected " PTR_FORMAT,                                      \
+      fatal3(_echo_fmt_5,                                                      \
              BCI(),                                                            \
              mdx,                                                              \
              mdx2);                                                            \
@@ -190,7 +185,7 @@
 
 // Aligns the method data pointer mdx to the current bytecode index.
 #define BI_PROFILE_ALIGN_TO_CURRENT_BCI()                                      \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                               \
     MethodData *md = istate->method()->method_data();                          \
     SET_MDX(md->data_layout_at(md->bci_to_di(BCI())));                         \
   }
@@ -198,62 +193,62 @@
 
 // Updates profiling data for a jump.
 #define BI_PROFILE_UPDATE_JUMP()                                               \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                               \
     BI_PROFILE_CHECK_MDX();                                                    \
-    JumpData::increment_taken_count_no_overflow(MDX());                        \
+    _JumpData__increment_taken_count_no_overflow(MDX());                       \
     /* Remember last branch taken count. */                                    \
-    mdo_last_branch_taken_count = JumpData::taken_count(MDX());                \
-    SET_MDX(JumpData::advance_taken(MDX()));                                   \
+    mdo_last_branch_taken_count = _JumpData__taken_count(MDX());               \
+    SET_MDX(_JumpData__advance_taken(MDX()));                                  \
   }
 
 
 // Updates profiling data for a taken/not taken branch.
 #define BI_PROFILE_UPDATE_BRANCH(is_taken)                                     \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {			\
     BI_PROFILE_CHECK_MDX();                                                    \
     if (is_taken) {                                                            \
-      BranchData::increment_taken_count_no_overflow(MDX());                    \
+      _BranchData__increment_taken_count_no_overflow(MDX());                   \
       /* Remember last branch taken count. */                                  \
-      mdo_last_branch_taken_count = BranchData::taken_count(MDX());            \
-      SET_MDX(BranchData::advance_taken(MDX()));                               \
+      mdo_last_branch_taken_count = _BranchData__taken_count(MDX());           \
+      SET_MDX(_BranchData__advance_taken(MDX()));                              \
     } else {                                                                   \
-      BranchData::increment_not_taken_count_no_overflow(MDX());                \
-      SET_MDX(BranchData::advance_not_taken(MDX()));                           \
+      _BranchData__increment_not_taken_count_no_overflow(MDX());               \
+      SET_MDX(_BranchData__advance_not_taken(MDX()));                          \
     }                                                                          \
   }
 
 
 // Updates profiling data for a ret with given bci.
 #define BI_PROFILE_UPDATE_RET(bci)                                             \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                               \
     BI_PROFILE_CHECK_MDX();                                                    \
     MethodData *md = istate->method()->method_data();                          \
 /* FIXME: there is more to do here than increment and advance(mdx)! */         \
-    CounterData::increment_count_no_overflow(MDX());                           \
-    SET_MDX(RetData::advance(md, bci));                                        \
+    _CounterData__increment_count_no_overflow(MDX());                          \
+    SET_MDX(_RetData__advance(md, bci));                                       \
   }
 
 // Decrement counter at checkcast if the subtype check fails (as template
 // interpreter does!).
 #define BI_PROFILE_SUBTYPECHECK_FAILED(receiver)                               \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                               \
     BI_PROFILE_CHECK_MDX();                                                    \
-    ReceiverTypeData::increment_receiver_count_no_overflow(MDX(), receiver);   \
-    ReceiverTypeData::decrement_count(MDX());                                  \
+    _ReceiverTypeData__increment_receiver_count_no_overflow(MDX(), receiver);  \
+    _ReceiverTypeData__decrement_count(MDX());                                  \
   }
 
 // Updates profiling data for a checkcast (was a null seen? which receiver?).
 #define BI_PROFILE_UPDATE_CHECKCAST(null_seen, receiver)                       \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                               \
     BI_PROFILE_CHECK_MDX();                                                    \
     if (null_seen) {                                                           \
-      ReceiverTypeData::set_null_seen(MDX());                                  \
+      _ReceiverTypeData__set_null_seen(MDX());                                 \
     } else {                                                                   \
       /* Template interpreter doesn't increment count. */                      \
       /* ReceiverTypeData::increment_count_no_overflow(MDX()); */              \
-      ReceiverTypeData::increment_receiver_count_no_overflow(MDX(), receiver); \
+      _ReceiverTypeData__increment_receiver_count_no_overflow(MDX(), receiver);\
     }                                                                          \
-    SET_MDX(ReceiverTypeData::advance(MDX()));                                 \
+    SET_MDX(_ReceiverTypeData__advance(MDX()));                                \
   }
 
 
@@ -263,39 +258,39 @@
 
 
 // Updates profiling data for a call.
-#define BI_PROFILE_UPDATE_CALL()                                               \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
-    BI_PROFILE_CHECK_MDX();                                                    \
-    CounterData::increment_count_no_overflow(MDX());                           \
-    SET_MDX(CounterData::advance(MDX()));                                      \
+#define BI_PROFILE_UPDATE_CALL()                                                \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                                \
+    BI_PROFILE_CHECK_MDX();                                                     \
+    _CounterData__increment_count_no_overflow(MDX());                           \
+    SET_MDX(_CounterData__advance(MDX()));                                      \
   }
 
 
 // Updates profiling data for a final call.
 #define BI_PROFILE_UPDATE_FINALCALL()                                          \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {			\
     BI_PROFILE_CHECK_MDX();                                                    \
-    VirtualCallData::increment_count_no_overflow(MDX());                       \
-    SET_MDX(VirtualCallData::advance(MDX()));                                  \
+    _VirtualCallData__increment_count_no_overflow(MDX());                       \
+    SET_MDX(_VirtualCallData__advance(MDX()));                                  \
   }
 
 
 // Updates profiling data for a virtual call with given receiver Klass.
 #define BI_PROFILE_UPDATE_VIRTUALCALL(receiver)                                \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                               \
     BI_PROFILE_CHECK_MDX();                                                    \
-    VirtualCallData::increment_receiver_count_no_overflow(MDX(), receiver);    \
-    SET_MDX(VirtualCallData::advance(MDX()));                                  \
+    _VirtualCallData__increment_receiver_count_no_overflow(MDX(), receiver);   \
+    SET_MDX(_VirtualCallData__advance(MDX()));                                 \
   }
 
 
 // Updates profiling data for a switch (tabelswitch or lookupswitch) with
 // given taken index (-1 means default case was taken).
 #define BI_PROFILE_UPDATE_SWITCH(switch_index)                                 \
-  if (ProfileInterpreter && MDX() != NULL) {                                   \
+  if ((*_ProfileInterpreter) && MDX() != NULL) {                               \
     BI_PROFILE_CHECK_MDX();                                                    \
-    MultiBranchData::increment_count_no_overflow(MDX(), switch_index);         \
-    SET_MDX(MultiBranchData::advance(MDX(), switch_index));                    \
+    _MultiBranchData__increment_count_no_overflow(MDX(), switch_index);        \
+    SET_MDX(_MultiBranchData__advance(MDX(), switch_index));                    \
   }
 
 

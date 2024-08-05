@@ -327,7 +327,7 @@
           if (osr_nmethod != NULL && osr_nmethod->osr_entry_bci() != InvalidOSREntryBci) {          \
             intptr_t* buf;                                                                          \
             /* Call OSR migration with last java frame only, no checks. */                          \
-            CALL_VM_NAKED_LJF(buf=_SharedRuntime__OSR_migration_begin(THREAD));                      \
+            CALL_VM_NAKED_LJF(buf=_SharedRuntime__OSR_migration_begin(THREAD));                     \
             istate->set_msg(do_osr);                                                                \
             istate->set_osr_buf((address)buf);                                                      \
             istate->set_osr_entry(osr_nmethod->osr_entry());                                        \
@@ -686,12 +686,24 @@ BytecodeInterpreter::run(interpreterState istate) {
 #ifdef VM_JVMTI
   bool              *volatile __jvmti_interp_events = &_jvmti_interp_events;
 #endif
+#ifdef CC_INTERP_PROFILE
+  const char        *volatile _echo_fmt_1 = "[%d]           %4d  " "mdx " PTR_FORMAT "(%d)" "  " " \t-> " PTR_FORMAT "(%d)";
+  const char        *volatile _echo_fmt_2 = "method data at mdx " PTR_FORMAT "(0) for";
+  const char        *volatile _echo_fmt_3 = "current mdx " PTR_FORMAT "(%d)";
+  const char        *volatile _echo_fmt_4 = "no method data";
+  const char        *volatile _one_str = "1";
+  const char        *volatile _two_str = "2";
+  const char        *volatile _three_str = "3";
+  const char        *volatile _echo_fmt_5 = "invalid mdx at bci %d:" " was " PTR_FORMAT " but expected " PTR_FORMAT;
+#endif
   
   // Pointers to external data, used to force absolute addressing in asm for One
   int               *volatile _BytecodeCounter___counter_value = &BytecodeCounter::_counter_value;
   static int        *volatile _InvocationCounter__InterpreterBackwardBranchLimit = &InvocationCounter::InterpreterBackwardBranchLimit;
+  static jint       *volatile _StubRoutines___verify_oop_count = &StubRoutines::_verify_oop_count;
   intx              *volatile _StopInterpreterAt = &StopInterpreterAt;
   bool              *volatile _TraceBytecodes = &TraceBytecodes;
+  bool              *volatile _TraceProfileInterpreter = &TraceProfileInterpreter;
   bool              *volatile _UseLoopCounter = &UseLoopCounter;
   bool              *volatile _UseOnStackReplacement = &UseOnStackReplacement;
   bool              *volatile _ProfileInterpreter = &ProfileInterpreter;
@@ -714,6 +726,7 @@ BytecodeInterpreter::run(interpreterState istate) {
   void              (*volatile _Exceptions___throw_msg)(Thread*, const char*, int, Symbol*, const char*) = Exceptions::_throw_msg;
   MethodCounters*   (*volatile _InterpreterRuntime__build_method_counters)(JavaThread*, Method*) = InterpreterRuntime::build_method_counters;
   nmethod*          (*volatile _InterpreterRuntime__frequency_counter_overflow)(JavaThread*, address) = InterpreterRuntime::frequency_counter_overflow;
+  void              (*volatile _InterpreterRuntime__profile_method)(JavaThread*) = InterpreterRuntime::profile_method;
   Symbol*           (*volatile _vmSymbols__java_lang_NullPointerException)() = vmSymbols::java_lang_NullPointerException;
   void              (*volatile _BytecodeInterpreter__astore)(intptr_t*, int, intptr_t*, int) = BytecodeInterpreter::astore;
   void              (*volatile _BytecodeInterpreter__dup)(intptr_t*) = BytecodeInterpreter::dup;
@@ -723,9 +736,29 @@ BytecodeInterpreter::run(interpreterState istate) {
   void              (*volatile _BytecodeInterpreter__dup2_x1)(intptr_t*) = BytecodeInterpreter::dup2_x1;
   void              (*volatile _BytecodeInterpreter__dup2_x2)(intptr_t*) = BytecodeInterpreter::dup2_x2;
   void              (*volatile _BytecodeInterpreter__swap)(intptr_t*) = BytecodeInterpreter::swap;
-
+#ifdef CC_INTERP
+  void              (*volatile _JumpData__increment_taken_count_no_overflow)(DataLayout*) = JumpData::increment_taken_count_no_overflow;
+  uint              (*volatile _JumpData__taken_count)(DataLayout*) = JumpData::taken_count;
+  DataLayout*       (*volatile _JumpData__advance_taken)(DataLayout*) = JumpData::advance_taken;
+  void              (*volatile _BranchData__increment_taken_count_no_overflow)(DataLayout*) = BranchData::increment_taken_count_no_overflow;
+  void              (*volatile _BranchData__increment_not_taken_count_no_overflow)(DataLayout*) = BranchData::increment_not_taken_count_no_overflow;
+  uint              (*volatile _BranchData__taken_count)(DataLayout*) = BranchData::taken_count;
+  DataLayout*       (*volatile _BranchData__advance_taken)(DataLayout*) = BranchData::advance_taken;
+  DataLayout*       (*volatile _BranchData__advance_not_taken)(DataLayout*) = BranchData::advance_not_taken;
+  void              (*volatile _CounterData__increment_count_no_overflow)(DataLayout*) = CounterData::increment_count_no_overflow;
+  DataLayout*       (*volatile _CounterData__advance)(DataLayout*) = CounterData::advance;
+  DataLayout*       (*volatile _RetData__advance)(MethodData*, int) = RetData::advance;
+  void              (*volatile _ReceiverTypeData__increment_receiver_count_no_overflow)(DataLayout*, Klass*) = ReceiverTypeData::increment_receiver_count_no_overflow;
+  void              (*volatile _ReceiverTypeData__decrement_count)(DataLayout*) = ReceiverTypeData::decrement_count;
+  void              (*volatile _ReceiverTypeData__set_null_seen)(DataLayout*) = ReceiverTypeData::set_null_seen;
+  DataLayout*       (*volatile _ReceiverTypeData__advance)(DataLayout*) = ReceiverTypeData::advance;
+  void              (*volatile _VirtualCallData__increment_count_no_overflow)(DataLayout*) = VirtualCallData::increment_count_no_overflow;
+  void              (*volatile _VirtualCallData__increment_receiver_count_no_overflow)(DataLayout*, Klass*) = VirtualCallData::increment_receiver_count_no_overflow;
+  DataLayout*       (*volatile _VirtualCallData__advance)(DataLayout*) = VirtualCallData::advance;
+#endif
+  void              (*volatile _MultiBranchData__increment_count_no_overflow)(DataLayout*, int) = MultiBranchData::increment_count_no_overflow;
 #endif /* USELABELS */
-
+  DataLayout*       (*volatile _MultiBranchData__advance)(DataLayout*, int) = MultiBranchData::advance;
 #ifdef ASSERT
   // this will trigger a VERIFY_OOP on entry
   if (istate->msg() != initialize && ! METHOD->is_static()) {
@@ -1327,7 +1360,7 @@ run:
                   break;
 
               case Bytecodes::_astore:
-                  astore(topOfStack, -1, locals, reg);
+                  _BytecodeInterpreter__astore(topOfStack, -1, locals, reg);
                   UPDATE_PC_AND_TOS_AND_CONTINUE(4, -1);
                   break;
 
